@@ -1,5 +1,8 @@
 # Intent-as-a-Service Windows 部署脚本
-# 使用方法：以管理员身份运行 PowerShell，然后执行：.\deploy-windows.ps1
+# 使用方法：
+#   方法1：双击运行 deploy.bat（推荐）
+#   方法2：在 PowerShell 中运行：powershell.exe -ExecutionPolicy Bypass -File .\deploy-windows.ps1
+#   方法3：以管理员身份运行 PowerShell，然后执行：.\deploy-windows.ps1
 
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "Intent-as-a-Service Windows 部署脚本" -ForegroundColor Cyan
