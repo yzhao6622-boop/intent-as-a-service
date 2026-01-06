@@ -1,0 +1,233 @@
+import express from 'express';
+import { authenticateToken, AuthRequest } from '../middleware/auth';
+import { dbRun, dbGet, dbAll } from '../db/schema';
+import { mineIntent, verifyIntent, trackIntentEvolution, generateIntentStages } from '../services/aiService';
+import { Intent, IntentProfile } from '../types';
+
+const router = express.Router();
+
+// 所有路由都需要认证
+router.use(authenticateToken);
+
+// 创建意图（从用户输入挖掘）
+router.post('/create', async (req: AuthRequest, res) => {
+  try {
+    const { userInput } = req.body;
+
+    if (!userInput) {
+      return res.status(400).json({ error: '用户输入是必填项' });
+    }
+
+    // AI挖掘意图
+    const minedIntent = await mineIntent(userInput);
+
+    // 创建意图记录
+    const result = await dbRun(
+      `INSERT INTO intents (user_id, title, description, category, time_window_days, credibility_score, status, stage)
+       VALUES (?, ?, ?, ?, ?, 0, 'active', 'initial')`,
+      [
+        req.user!.id,
+        minedIntent.title,
+        minedIntent.description,
+        minedIntent.category,
+        minedIntent.time_window_days,
+      ]
+    );
+
+    const intentId = (result as any).lastID;
+
+    // 生成阶段拆解
+    const intent = await dbGet('SELECT * FROM intents WHERE id = ?', [intentId]) as Intent;
+    const stagesData = await generateIntentStages(intent);
+
+    // 保存阶段
+    for (const stage of stagesData.stages) {
+      await dbRun(
+        `INSERT INTO intent_stages (intent_id, stage_name, stage_order, description, verification_points)
+         VALUES (?, ?, ?, ?, ?)`,
+        [intentId, stage.stage_name, stage.stage_order, stage.description, stage.verification_points]
+      );
+    }
+
+    // 初始验证
+    const verification = await verifyIntent(intentId);
+    await dbRun(
+      `UPDATE intents SET credibility_score = ? WHERE id = ?`,
+      [verification.credibility_score, intentId]
+    );
+
+    await dbRun(
+      `INSERT INTO verification_records (intent_id, verification_type, ai_analysis, passed)
+       VALUES (?, 'initial', ?, ?)`,
+      [intentId, verification.analysis, verification.passed ? 1 : 0]
+    );
+
+    // 返回完整的意图档案
+    const intentProfile = await getIntentProfile(intentId);
+    res.json(intentProfile);
+  } catch (error) {
+    console.error('创建意图错误:', error);
+    res.status(500).json({ error: '创建意图失败' });
+  }
+});
+
+// 获取用户的意图列表
+router.get('/list', async (req: AuthRequest, res) => {
+  try {
+    const intents = await dbAll(
+      'SELECT * FROM intents WHERE user_id = ? ORDER BY created_at DESC',
+      [req.user!.id]
+    ) as Intent[];
+
+    res.json(intents);
+  } catch (error) {
+    console.error('获取意图列表错误:', error);
+    res.status(500).json({ error: '获取意图列表失败' });
+  }
+});
+
+// 获取意图详情（完整档案）
+router.get('/:id', async (req: AuthRequest, res) => {
+  try {
+    const intentId = parseInt(req.params.id);
+    const intent = await dbGet('SELECT * FROM intents WHERE id = ?', [intentId]) as Intent;
+
+    if (!intent) {
+      return res.status(404).json({ error: '意图不存在' });
+    }
+
+    if (intent.user_id !== req.user!.id) {
+      return res.status(403).json({ error: '无权访问此意图' });
+    }
+
+    const intentProfile = await getIntentProfile(intentId);
+    res.json(intentProfile);
+  } catch (error) {
+    console.error('获取意图详情错误:', error);
+    res.status(500).json({ error: '获取意图详情失败' });
+  }
+});
+
+// 验证意图
+router.post('/:id/verify', async (req: AuthRequest, res) => {
+  try {
+    const intentId = parseInt(req.params.id);
+    const intent = await dbGet('SELECT * FROM intents WHERE id = ?', [intentId]) as Intent;
+
+    if (!intent || intent.user_id !== req.user!.id) {
+      return res.status(403).json({ error: '无权访问此意图' });
+    }
+
+    const verification = await verifyIntent(intentId);
+
+    // 更新可信度评分
+    await dbRun(
+      'UPDATE intents SET credibility_score = ? WHERE id = ?',
+      [verification.credibility_score, intentId]
+    );
+
+    // 保存验证记录
+    await dbRun(
+      `INSERT INTO verification_records (intent_id, verification_type, ai_analysis, passed)
+       VALUES (?, 'periodic', ?, ?)`,
+      [intentId, verification.analysis, verification.passed ? 1 : 0]
+    );
+
+    res.json(verification);
+  } catch (error) {
+    console.error('验证意图错误:', error);
+    res.status(500).json({ error: '验证意图失败' });
+  }
+});
+
+// 追踪意图演进
+router.post('/:id/track', async (req: AuthRequest, res) => {
+  try {
+    const intentId = parseInt(req.params.id);
+    const intent = await dbGet('SELECT * FROM intents WHERE id = ?', [intentId]) as Intent;
+
+    if (!intent || intent.user_id !== req.user!.id) {
+      return res.status(403).json({ error: '无权访问此意图' });
+    }
+
+    const evolution = await trackIntentEvolution(intentId);
+
+    // 更新意图阶段
+    await dbRun(
+      'UPDATE intents SET stage = ? WHERE id = ?',
+      [evolution.current_stage, intentId]
+    );
+
+    // 保存进展记录
+    await dbRun(
+      `INSERT INTO intent_progress (intent_id, progress_percentage, milestone, ai_assessment)
+       VALUES (?, ?, ?, ?)`,
+      [
+        intentId,
+        evolution.progress_percentage,
+        evolution.next_milestone,
+        JSON.stringify(evolution.recommendations),
+      ]
+    );
+
+    res.json(evolution);
+  } catch (error) {
+    console.error('追踪意图演进错误:', error);
+    res.status(500).json({ error: '追踪意图演进失败' });
+  }
+});
+
+// 更新意图状态
+router.patch('/:id/status', async (req: AuthRequest, res) => {
+  try {
+    const intentId = parseInt(req.params.id);
+    const { status } = req.body;
+
+    if (!['active', 'completed', 'abandoned', 'paused'].includes(status)) {
+      return res.status(400).json({ error: '无效的状态' });
+    }
+
+    const intent = await dbGet('SELECT * FROM intents WHERE id = ?', [intentId]) as Intent;
+    if (!intent || intent.user_id !== req.user!.id) {
+      return res.status(403).json({ error: '无权访问此意图' });
+    }
+
+    await dbRun('UPDATE intents SET status = ? WHERE id = ?', [status, intentId]);
+
+    res.json({ message: '状态更新成功' });
+  } catch (error) {
+    console.error('更新意图状态错误:', error);
+    res.status(500).json({ error: '更新意图状态失败' });
+  }
+});
+
+// 辅助函数：获取完整的意图档案
+async function getIntentProfile(intentId: number): Promise<IntentProfile> {
+  const intent = await dbGet('SELECT * FROM intents WHERE id = ?', [intentId]) as Intent;
+  const stages = await dbAll(
+    'SELECT * FROM intent_stages WHERE intent_id = ? ORDER BY stage_order',
+    [intentId]
+  );
+  const recentVerifications = await dbAll(
+    'SELECT * FROM verification_records WHERE intent_id = ? ORDER BY created_at DESC LIMIT 5',
+    [intentId]
+  );
+  const progressRecords = await dbAll(
+    'SELECT * FROM intent_progress WHERE intent_id = ? ORDER BY created_at DESC LIMIT 1',
+    [intentId]
+  );
+
+  const progress_percentage = progressRecords.length > 0
+    ? (progressRecords[0] as any).progress_percentage
+    : 0;
+
+  return {
+    intent,
+    stages,
+    credibility_score: intent.credibility_score,
+    progress_percentage,
+    recent_verifications: recentVerifications as any,
+  };
+}
+
+export default router;
