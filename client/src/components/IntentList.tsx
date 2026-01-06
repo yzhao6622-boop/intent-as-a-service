@@ -1,4 +1,3 @@
-import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 
@@ -17,7 +16,7 @@ interface IntentListProps {
   onUpdate: () => void;
 }
 
-export default function IntentList({ intents, onUpdate }: IntentListProps) {
+export default function IntentList({ intents }: IntentListProps) {
   const navigate = useNavigate();
 
   const getStatusColor = (status: string) => {

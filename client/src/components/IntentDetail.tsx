@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import apiClient from '../api/client';
 import AIChat from './AIChat';
@@ -183,7 +183,7 @@ export default function IntentDetail() {
             <div className="bg-white rounded-lg shadow-md p-6">
               <h3 className="text-xl font-bold mb-4">阶段拆解</h3>
               <div className="space-y-4">
-                {profile.stages.map((stage, index) => (
+                {profile.stages.map((stage) => (
                   <div
                     key={stage.id}
                     className={`border-l-4 pl-4 ${
