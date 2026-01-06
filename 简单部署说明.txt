@@ -1,0 +1,64 @@
+========================================
+Intent-as-a-Service 简单部署说明
+========================================
+
+【方法1：使用批处理文件（最简单）】
+
+1. 右键点击 "部署.bat"
+2. 选择"以管理员身份运行"
+3. 等待部署完成
+4. 编辑 .env 文件，填入配置
+5. 双击 "启动应用.bat" 启动应用
+
+========================================
+
+【方法2：手动执行命令】
+
+1. 以管理员身份打开 CMD 或 PowerShell
+
+2. 进入项目目录
+   cd D:\intent-as-a-service
+
+3. 安装依赖
+   npm install
+   cd client
+   npm install
+   cd ..
+
+4. 配置环境变量
+   copy env.example .env
+   notepad .env
+   (编辑 .env 文件，填入配置)
+
+5. 初始化数据库
+   npm run migrate
+
+6. 构建应用
+   npm run build
+
+7. 启动应用
+   npm start
+   或
+   npm install -g pm2
+   pm2 start ecosystem.config.js
+
+========================================
+
+【重要提示】
+
+1. 必须以管理员身份运行
+2. 确保 Node.js 已安装
+3. 配置 .env 文件中的：
+   - JWT_SECRET
+   - ARK_API_KEY
+   - ARK_MODEL_ID
+
+4. 配置防火墙：
+   - Windows 防火墙开放 3002 和 5173 端口
+   - 阿里云安全组配置端口规则
+
+5. 访问地址：
+   - 后端: http://your-ip:3002
+   - 前端: http://your-ip:5173
+
+========================================
