@@ -15,7 +15,7 @@ const PORT = parseInt(process.env.PORT || '3002', 10);
 
 // 中间件
 // CORS 配置 - 明确配置，确保预检请求能通过
-app.use(cors({
+const corsOptions = {
   origin: function (origin, callback) {
     // 允许所有来源（包括IP地址和localhost）
     // 生产环境可以限制为特定域名
@@ -28,10 +28,20 @@ app.use(cors({
   preflightContinue: false,
   optionsSuccessStatus: 204,
   maxAge: 86400, // 预检请求缓存24小时
-}));
+};
 
-// 明确处理 OPTIONS 预检请求（双重保障）
-app.options('*', cors());
+// 应用CORS中间件
+app.use(cors(corsOptions));
+
+// 明确处理所有 OPTIONS 预检请求（在所有路由之前）
+app.options('*', (req, res) => {
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Max-Age', '86400');
+  res.sendStatus(204);
+});
 
 app.use(express.json());
 
