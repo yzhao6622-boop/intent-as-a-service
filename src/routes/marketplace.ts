@@ -62,7 +62,8 @@ router.get('/browse', async (req: AuthRequest, res) => {
   try {
     const { category, min_credibility } = req.query;
 
-    // 查询所有意图，不仅仅是已发布的
+    // 查询所有意图，不仅仅是已发布的（可选：排除当前用户的意图）
+    // 注释掉排除当前用户，让所有用户都能看到所有意图
     let query = `
       SELECT 
         i.id as intent_id,
@@ -100,6 +101,8 @@ router.get('/browse', async (req: AuthRequest, res) => {
     query += ' ORDER BY i.credibility_score DESC, i.created_at DESC';
 
     const listings = await dbAll(query, params) as any[];
+
+    console.log(`市场查询结果: ${listings.length} 个意图`);
 
     // 脱敏用户名/邮箱
     const maskedListings = listings.map(listing => ({
