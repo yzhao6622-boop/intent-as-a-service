@@ -23,7 +23,6 @@ interface IntentListProps {
 export default function IntentList({ intents, onUpdate }: IntentListProps) {
   const navigate = useNavigate();
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
-  const [deleting, setDeleting] = useState(false);
   const toast = useToast();
 
   const getStatusColor = (status: string) => {
@@ -59,17 +58,26 @@ export default function IntentList({ intents, onUpdate }: IntentListProps) {
   const handleDeleteConfirm = async () => {
     if (!deleteConfirm) return;
 
-    setDeleting(true);
     try {
+      console.log('正在删除意图 ID:', deleteConfirm);
       await apiClient.delete(`/intents/${deleteConfirm}`);
+      console.log('删除成功');
       toast.success('意图已删除');
       setDeleteConfirm(null);
       onUpdate(); // 刷新列表
     } catch (err: any) {
-      const errorMsg = err.response?.data?.error || '删除失败';
+      console.error('删除失败:', err);
+      let errorMsg = '删除失败';
+      
+      if (err.response) {
+        errorMsg = err.response.data?.error || `服务器错误: ${err.response.status}`;
+      } else if (err.request) {
+        errorMsg = '无法连接到服务器，请检查网络连接和后端服务是否运行';
+      } else {
+        errorMsg = err.message || '删除失败';
+      }
+      
       toast.error(errorMsg);
-    } finally {
-      setDeleting(false);
     }
   };
 

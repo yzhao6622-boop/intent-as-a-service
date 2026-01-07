@@ -34,10 +34,25 @@ export default function Dashboard() {
   const fetchIntents = async () => {
     try {
       setError('');
+      console.log('正在获取意图列表...');
       const response = await apiClient.get('/intents/list');
+      console.log('获取意图列表成功:', response.data);
       setIntents(response.data);
     } catch (err: any) {
-      const errorMsg = err.response?.data?.error || '获取意图列表失败';
+      console.error('获取意图列表失败:', err);
+      let errorMsg = '获取意图列表失败';
+      
+      if (err.response) {
+        // 服务器返回了错误响应
+        errorMsg = err.response.data?.error || `服务器错误: ${err.response.status}`;
+      } else if (err.request) {
+        // 请求已发出但没有收到响应
+        errorMsg = '无法连接到服务器，请检查网络连接和后端服务是否运行';
+      } else {
+        // 其他错误
+        errorMsg = err.message || '获取意图列表失败';
+      }
+      
       setError(errorMsg);
       toast.error(errorMsg);
     } finally {

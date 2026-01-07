@@ -46,6 +46,26 @@ apiClient.interceptors.request.use((config) => {
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
+    // 详细错误日志
+    if (error.response) {
+      // 服务器返回了响应，但状态码不在 2xx 范围内
+      console.error('API错误响应:', {
+        status: error.response.status,
+        statusText: error.response.statusText,
+        data: error.response.data,
+        url: error.config?.url,
+      });
+    } else if (error.request) {
+      // 请求已发出，但没有收到响应
+      console.error('API请求错误: 无响应', {
+        url: error.config?.url,
+        message: error.message,
+      });
+    } else {
+      // 在设置请求时出错
+      console.error('API请求配置错误:', error.message);
+    }
+
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');

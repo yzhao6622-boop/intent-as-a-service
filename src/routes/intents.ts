@@ -74,15 +74,18 @@ router.post('/create', async (req: AuthRequest, res) => {
 // 获取用户的意图列表
 router.get('/list', async (req: AuthRequest, res) => {
   try {
+    console.log(`[GET /list] 用户ID: ${req.user!.id}`);
     const intents = await dbAll(
       'SELECT * FROM intents WHERE user_id = ? ORDER BY created_at DESC',
       [req.user!.id]
     ) as Intent[];
 
+    console.log(`[GET /list] 找到 ${intents.length} 个意图`);
     res.json(intents);
-  } catch (error) {
-    console.error('获取意图列表错误:', error);
-    res.status(500).json({ error: '获取意图列表失败' });
+  } catch (error: any) {
+    console.error('[GET /list] 获取意图列表错误:', error);
+    console.error('[GET /list] 错误详情:', error.message, error.stack);
+    res.status(500).json({ error: `获取意图列表失败: ${error.message}` });
   }
 });
 
