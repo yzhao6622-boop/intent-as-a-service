@@ -1,5 +1,4 @@
-import sqlite3 from 'sqlite3';
-import { promisify } from 'util';
+import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 
@@ -11,33 +10,45 @@ if (!fs.existsSync(dbDir)) {
   fs.mkdirSync(dbDir, { recursive: true });
 }
 
-const db = new sqlite3.Database(dbPath);
+const db = new Database(dbPath);
 
-// 包装数据库方法以支持Promise和参数
-export function dbRun(sql: string, params?: any[]): Promise<sqlite3.RunResult> {
+// 启用外键约束
+db.pragma('foreign_keys = ON');
+
+// 包装数据库方法以支持Promise（better-sqlite3 是同步的，但为了兼容性提供 Promise 包装）
+export function dbRun(sql: string, params?: any[]): Promise<any> {
   return new Promise((resolve, reject) => {
-    db.run(sql, params || [], function(err) {
-      if (err) reject(err);
-      else resolve(this);
-    });
+    try {
+      const stmt = db.prepare(sql);
+      const result = params ? stmt.run(...params) : stmt.run();
+      resolve(result);
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 
 export function dbGet(sql: string, params?: any[]): Promise<any> {
   return new Promise((resolve, reject) => {
-    db.get(sql, params || [], (err, row) => {
-      if (err) reject(err);
-      else resolve(row);
-    });
+    try {
+      const stmt = db.prepare(sql);
+      const result = params ? stmt.get(...params) : stmt.get();
+      resolve(result);
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 
 export function dbAll(sql: string, params?: any[]): Promise<any[]> {
   return new Promise((resolve, reject) => {
-    db.all(sql, params || [], (err, rows) => {
-      if (err) reject(err);
-      else resolve(rows);
-    });
+    try {
+      const stmt = db.prepare(sql);
+      const result = params ? stmt.all(...params) : stmt.all();
+      resolve(result);
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 

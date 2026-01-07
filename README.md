@@ -149,6 +149,35 @@ intent-as-a-service/
 - 数据库使用SQLite，文件存储在 `data/intent.db`
 - AI服务需要火山方舟（Ark）API密钥和模型ID
 
+## 项目文档
+
+- **启动说明**：`启动说明.md` - 本地开发启动指南
+- **功能说明**：`功能说明.md` - 完整功能列表和API文档
+- **火山方舟配置**：`火山方舟配置说明.md` - AI服务配置详细说明
+- **API配置检查**：`API配置检查.md` - API配置问题排查
+- **部署指南**：`部署指南.md` - 云端部署完整指南
+- **阿里云Windows部署**：`阿里云Windows部署指南.md` - 阿里云Windows服务器部署
+- **PM2使用指南**：`PM2使用指南.md` - 进程管理工具使用
+- **Git配置指南**：`Git配置和使用指南.md` - Git配置和代码更新
+- **项目更新指南**：`项目更新指南.md` - 服务器上更新项目的方法
+
+## 常用脚本
+
+### 开发
+- `npm run dev` - 同时启动前后端开发服务器
+- `npm run dev:server` - 仅启动后端
+- `npm run dev:client` - 仅启动前端
+
+### 构建
+- `npm run build` - 构建前后端
+- `npm run build:server` - 仅构建后端
+- `npm run build:client` - 仅构建前端
+
+### 部署
+- `一键启动所有服务.bat` - 使用PM2启动所有服务（Windows）
+- `更新项目.bat` - 更新项目代码和依赖（Windows）
+- `检查Git配置.bat` - 检查Git配置状态（Windows）
+
 ## License
 
 MIT
