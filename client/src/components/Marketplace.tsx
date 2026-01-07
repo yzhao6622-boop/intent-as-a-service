@@ -1,18 +1,26 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../api/client';
+import Loading from './Loading';
+import EmptyState from './EmptyState';
+import { useToast, ToastContainer } from './Toast';
 
 interface MarketplaceListing {
-  id: number;
+  id?: number;
   intent_id: number;
+  marketplace_id?: number;
   title: string;
   description: string;
   category: string;
   credibility_score: number;
   time_window_days: number;
   price?: number;
-  transaction_type: string;
+  transaction_type?: string;
   seller_name?: string;
+  seller_email?: string;
+  status?: string;
+  marketplace_status?: string;
+  created_at?: string;
 }
 
 export default function Marketplace() {
@@ -21,6 +29,8 @@ export default function Marketplace() {
   const [loading, setLoading] = useState(true);
   const [category, setCategory] = useState('');
   const [minCredibility, setMinCredibility] = useState('');
+  const [error, setError] = useState('');
+  const toast = useToast();
 
   useEffect(() => {
     fetchListings();
@@ -28,46 +38,46 @@ export default function Marketplace() {
 
   const fetchListings = async () => {
     try {
+      setError('');
       const params: any = {};
       if (category) params.category = category;
       if (minCredibility) params.min_credibility = minCredibility;
 
       const response = await apiClient.get('/marketplace/browse', { params });
       setListings(response.data);
-    } catch (error) {
-      console.error('获取市场列表失败:', error);
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.error || '获取市场列表失败';
+      setError(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
   };
 
-  const handlePurchase = async (marketplaceId: number) => {
-    // 使用更友好的确认对话框
+  const handlePurchase = async (listing: MarketplaceListing) => {
+    // 如果已经在市场发布，使用marketplace_id
+    const marketplaceId = listing.marketplace_id || listing.id;
+    if (!marketplaceId) {
+      toast.error('该意图暂不可购买');
+      return;
+    }
+
     if (!window.confirm('确定要购买/订阅这个意图吗？')) return;
 
     try {
       await apiClient.post(`/marketplace/purchase/${marketplaceId}`);
-      // 使用toast替代alert
-      if (window.toast) {
-        window.toast.success('购买成功！');
-      } else {
-        alert('购买成功！');
-      }
+      toast.success('购买成功！');
       fetchListings();
-    } catch (error: any) {
-      const errorMsg = error.response?.data?.error || '购买失败';
-      if (window.toast) {
-        window.toast.error(errorMsg);
-      } else {
-        alert(errorMsg);
-      }
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.error || '购买失败';
+      toast.error(errorMsg);
     }
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-xl">加载中...</div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <Loading text="加载市场列表..." size="lg" />
       </div>
     );
   }
@@ -128,18 +138,47 @@ export default function Marketplace() {
           </div>
         </div>
 
-        {listings.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-lg shadow">
-            <p className="text-gray-500 text-lg">暂无可用意图</p>
+        {error && !loading && (
+          <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+            {error}
+            <button
+              onClick={fetchListings}
+              className="ml-4 text-red-600 underline hover:text-red-800"
+            >
+              重试
+            </button>
           </div>
+        )}
+
+        {!loading && listings.length === 0 && !error ? (
+          <EmptyState
+            title="暂无可用意图"
+            description="当前市场中没有可用的意图"
+            icon="📋"
+          />
         ) : (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {listings.map((listing) => (
+            {listings.map((listing, index) => (
               <div
-                key={listing.id}
+                key={listing.intent_id || listing.id || index}
                 className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition"
               >
-                <h3 className="text-xl font-semibold mb-2">{listing.title}</h3>
+                <div className="flex justify-between items-start mb-2">
+                  <h3 className="text-xl font-semibold flex-1 pr-2">{listing.title}</h3>
+                  {listing.marketplace_status === 'available' && (
+                    <span className="px-2 py-1 text-xs font-semibold rounded bg-green-100 text-green-800">
+                      已发布
+                    </span>
+                  )}
+                </div>
+
+                {/* 显示用户名（已脱敏） */}
+                {listing.seller_email && (
+                  <div className="text-xs text-gray-500 mb-2">
+                    发布者: {listing.seller_email}
+                  </div>
+                )}
+
                 <p className="text-gray-600 text-sm mb-4 line-clamp-3">
                   {listing.description}
                 </p>
@@ -150,7 +189,15 @@ export default function Marketplace() {
                   </span>
                   <div className="flex items-center">
                     <span className="text-sm text-gray-600">可信度:</span>
-                    <span className="ml-1 font-semibold text-green-600">
+                    <span
+                      className={`ml-1 font-semibold ${
+                        listing.credibility_score >= 70
+                          ? 'text-green-600'
+                          : listing.credibility_score >= 50
+                          ? 'text-yellow-600'
+                          : 'text-red-600'
+                      }`}
+                    >
                       {listing.credibility_score.toFixed(0)}
                     </span>
                   </div>
@@ -162,16 +209,24 @@ export default function Marketplace() {
                   </div>
                 )}
 
+                {listing.time_window_days && (
+                  <div className="text-xs text-gray-500 mb-4">
+                    时间窗口: {listing.time_window_days} 天
+                  </div>
+                )}
+
                 <button
-                  onClick={() => handlePurchase(listing.id)}
-                  className="w-full bg-indigo-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-indigo-700"
+                  onClick={() => handlePurchase(listing)}
+                  className="w-full bg-indigo-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-indigo-700 transition"
                 >
-                  购买/订阅
+                  {listing.marketplace_status === 'available' ? '购买/订阅' : '查看详情'}
                 </button>
               </div>
             ))}
           </div>
         )}
+
+        <ToastContainer toasts={toast.toasts} onRemove={toast.removeToast} />
       </main>
     </div>
   );

@@ -201,6 +201,35 @@ router.patch('/:id/status', async (req: AuthRequest, res) => {
   }
 });
 
+// 删除意图
+router.delete('/:id', async (req: AuthRequest, res) => {
+  try {
+    const intentId = parseInt(req.params.id);
+    const intent = await dbGet('SELECT * FROM intents WHERE id = ?', [intentId]) as Intent;
+
+    if (!intent) {
+      return res.status(404).json({ error: '意图不存在' });
+    }
+
+    if (intent.user_id !== req.user!.id) {
+      return res.status(403).json({ error: '无权删除此意图' });
+    }
+
+    // 删除相关的所有数据（级联删除）
+    await dbRun('DELETE FROM verification_records WHERE intent_id = ?', [intentId]);
+    await dbRun('DELETE FROM intent_stages WHERE intent_id = ?', [intentId]);
+    await dbRun('DELETE FROM intent_progress WHERE intent_id = ?', [intentId]);
+    await dbRun('DELETE FROM ai_conversations WHERE intent_id = ?', [intentId]);
+    await dbRun('DELETE FROM intent_marketplace WHERE intent_id = ?', [intentId]);
+    await dbRun('DELETE FROM intents WHERE id = ?', [intentId]);
+
+    res.json({ message: '意图已删除' });
+  } catch (error) {
+    console.error('删除意图错误:', error);
+    res.status(500).json({ error: '删除意图失败' });
+  }
+});
+
 // 辅助函数：获取完整的意图档案
 async function getIntentProfile(intentId: number): Promise<IntentProfile> {
   const intent = await dbGet('SELECT * FROM intents WHERE id = ?', [intentId]) as Intent;
