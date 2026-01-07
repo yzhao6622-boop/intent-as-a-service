@@ -14,34 +14,16 @@ const app = express();
 const PORT = process.env.PORT || 3002;
 
 // 中间件
-// CORS 配置 - 允许所有来源（生产环境建议限制）
-const corsOptions = {
-  origin: (origin, callback) => {
-    // 允许没有origin的请求（如Postman, curl）
-    if (!origin) return callback(null, true);
-    
-    // 如果设置了FRONTEND_URL，检查是否在允许列表中
-    if (process.env.FRONTEND_URL) {
-      const allowedOrigins = process.env.FRONTEND_URL.split(',');
-      if (allowedOrigins.indexOf(origin) !== -1) {
-        return callback(null, true);
-      }
-    }
-    
-    // 开发环境或未设置FRONTEND_URL时，允许所有来源
-    if (process.env.NODE_ENV !== 'production' || !process.env.FRONTEND_URL) {
-      return callback(null, true);
-    }
-    
-    // 生产环境且不在允许列表中
-    const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-    return callback(new Error(msg), false);
-  },
+// CORS 配置 - 简化配置，确保预检请求能通过
+app.use(cors({
+  origin: true, // 允许所有来源（生产环境建议限制）
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-};
-app.use(cors(corsOptions));
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Content-Length', 'X-Foo', 'X-Bar'],
+  preflightContinue: false,
+  optionsSuccessStatus: 204,
+}));
 app.use(express.json());
 
 // 路由
