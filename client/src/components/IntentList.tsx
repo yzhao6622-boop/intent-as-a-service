@@ -45,12 +45,7 @@ export default function IntentList({ intents }: IntentListProps) {
   };
 
   if (intents.length === 0) {
-    return (
-      <div className="text-center py-12 bg-white rounded-lg shadow">
-        <p className="text-gray-500 text-lg">还没有创建任何意图</p>
-        <p className="text-gray-400 mt-2">点击"创建新意图"开始</p>
-      </div>
-    );
+    return null; // 空状态由父组件处理
   }
 
   return (

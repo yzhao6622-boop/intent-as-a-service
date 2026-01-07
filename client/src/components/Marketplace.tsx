@@ -42,14 +42,25 @@ export default function Marketplace() {
   };
 
   const handlePurchase = async (marketplaceId: number) => {
-    if (!confirm('确定要购买/订阅这个意图吗？')) return;
+    // 使用更友好的确认对话框
+    if (!window.confirm('确定要购买/订阅这个意图吗？')) return;
 
     try {
       await apiClient.post(`/marketplace/purchase/${marketplaceId}`);
-      alert('购买成功！');
+      // 使用toast替代alert
+      if (window.toast) {
+        window.toast.success('购买成功！');
+      } else {
+        alert('购买成功！');
+      }
       fetchListings();
     } catch (error: any) {
-      alert(error.response?.data?.error || '购买失败');
+      const errorMsg = error.response?.data?.error || '购买失败';
+      if (window.toast) {
+        window.toast.error(errorMsg);
+      } else {
+        alert(errorMsg);
+      }
     }
   };
 

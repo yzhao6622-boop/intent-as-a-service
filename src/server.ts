@@ -72,9 +72,11 @@ async function startServer() {
       }
 
       try {
-        server = app.listen(PORT, () => {
-          console.log(`🚀 服务器运行在 http://localhost:${PORT}`);
-          console.log(`📊 API文档: http://localhost:${PORT}/health`);
+        server = app.listen(PORT, '0.0.0.0', () => {
+          console.log(`🚀 服务器运行在 http://0.0.0.0:${PORT}`);
+          console.log(`📊 本地访问: http://localhost:${PORT}`);
+          console.log(`📊 远程访问: http://your-server-ip:${PORT}`);
+          console.log(`📊 健康检查: http://your-server-ip:${PORT}/health`);
         });
 
         // 处理服务器错误

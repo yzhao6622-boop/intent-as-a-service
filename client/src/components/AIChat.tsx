@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import apiClient from '../api/client';
+import { useToast, ToastContainer } from './Toast';
+import { LoadingSpinner } from './Loading';
 
 interface AIChatProps {
   intentId: number;
@@ -10,6 +12,7 @@ export default function AIChat({ intentId }: AIChatProps) {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const toast = useToast();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -36,8 +39,9 @@ export default function AIChat({ intentId }: AIChatProps) {
         ...prev,
         { role: 'assistant', content: response.data.response },
       ]);
-    } catch (error) {
-      console.error('发送消息失败:', error);
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.error || '发送消息失败';
+      toast.error(errorMsg);
       setMessages((prev) => [
         ...prev,
         {
@@ -87,8 +91,9 @@ export default function AIChat({ intentId }: AIChatProps) {
 
         {loading && (
           <div className="flex justify-start">
-            <div className="bg-gray-100 text-gray-800 px-4 py-2 rounded-lg">
-              AI正在思考...
+            <div className="bg-gray-100 text-gray-800 px-4 py-2 rounded-lg flex items-center space-x-2">
+              <LoadingSpinner className="text-gray-600" />
+              <span>AI正在思考...</span>
             </div>
           </div>
         )}
@@ -109,12 +114,20 @@ export default function AIChat({ intentId }: AIChatProps) {
           <button
             type="submit"
             disabled={loading || !input.trim()}
-            className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
           >
-            发送
+            {loading ? (
+              <>
+                <LoadingSpinner className="mr-2" />
+                发送中...
+              </>
+            ) : (
+              '发送'
+            )}
           </button>
         </div>
       </form>
+      <ToastContainer toasts={toast.toasts} onRemove={toast.removeToast} />
     </div>
   );
 }

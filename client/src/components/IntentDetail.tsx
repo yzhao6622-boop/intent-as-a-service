@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import apiClient from '../api/client';
 import AIChat from './AIChat';
+import Loading from './Loading';
+import { useToast, ToastContainer } from './Toast';
+import LoadingSpinner from './Loading';
 
 interface IntentProfile {
   intent: {
@@ -38,6 +41,9 @@ export default function IntentDetail() {
   const [profile, setProfile] = useState<IntentProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'chat'>('overview');
+  const [verifying, setVerifying] = useState(false);
+  const [tracking, setTracking] = useState(false);
+  const toast = useToast();
 
   useEffect(() => {
     fetchIntentDetail();
@@ -47,43 +53,64 @@ export default function IntentDetail() {
     try {
       const response = await apiClient.get(`/intents/${id}`);
       setProfile(response.data);
-    } catch (error) {
-      console.error('获取意图详情失败:', error);
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.error || '获取意图详情失败';
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
   };
 
   const handleVerify = async () => {
+    setVerifying(true);
     try {
       await apiClient.post(`/intents/${id}/verify`);
+      toast.success('意图验证完成！');
       fetchIntentDetail();
-    } catch (error) {
-      console.error('验证失败:', error);
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.error || '验证失败';
+      toast.error(errorMsg);
+    } finally {
+      setVerifying(false);
     }
   };
 
   const handleTrack = async () => {
+    setTracking(true);
     try {
       await apiClient.post(`/intents/${id}/track`);
+      toast.success('意图演进追踪完成！');
       fetchIntentDetail();
-    } catch (error) {
-      console.error('追踪失败:', error);
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.error || '追踪失败';
+      toast.error(errorMsg);
+    } finally {
+      setTracking(false);
     }
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-xl">加载中...</div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <Loading text="加载意图详情..." size="lg" />
       </div>
     );
   }
 
   if (!profile) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-xl">意图不存在</div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="text-6xl mb-4">😕</div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">意图不存在</h2>
+          <p className="text-gray-600 mb-6">该意图可能已被删除或不存在</p>
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-indigo-700"
+          >
+            返回仪表板
+          </button>
+        </div>
       </div>
     );
   }
@@ -142,15 +169,31 @@ export default function IntentDetail() {
           <div className="flex space-x-4">
             <button
               onClick={handleVerify}
-              className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-indigo-700"
+              disabled={verifying}
+              className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
             >
-              验证意图
+              {verifying ? (
+                <>
+                  <LoadingSpinner className="mr-2" />
+                  验证中...
+                </>
+              ) : (
+                '验证意图'
+              )}
             </button>
             <button
               onClick={handleTrack}
-              className="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700"
+              disabled={tracking}
+              className="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
             >
-              追踪演进
+              {tracking ? (
+                <>
+                  <LoadingSpinner className="mr-2" />
+                  追踪中...
+                </>
+              ) : (
+                '追踪演进'
+              )}
             </button>
           </div>
         </div>
@@ -249,6 +292,7 @@ export default function IntentDetail() {
         {activeTab === 'chat' && (
           <AIChat intentId={parseInt(id!)} />
         )}
+        <ToastContainer toasts={toast.toasts} onRemove={toast.removeToast} />
       </main>
     </div>
   );

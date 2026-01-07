@@ -4,6 +4,9 @@ import { useNavigate } from 'react-router-dom';
 import apiClient from '../api/client';
 import CreateIntent from './CreateIntent';
 import IntentList from './IntentList';
+import Loading from './Loading';
+import EmptyState from './EmptyState';
+import { useToast, ToastContainer } from './Toast';
 
 interface Intent {
   id: number;
@@ -21,6 +24,8 @@ export default function Dashboard() {
   const [intents, setIntents] = useState<Intent[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [error, setError] = useState('');
+  const toast = useToast();
 
   useEffect(() => {
     fetchIntents();
@@ -28,10 +33,13 @@ export default function Dashboard() {
 
   const fetchIntents = async () => {
     try {
+      setError('');
       const response = await apiClient.get('/intents/list');
       setIntents(response.data);
-    } catch (error) {
-      console.error('获取意图列表失败:', error);
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.error || '获取意图列表失败';
+      setError(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -44,8 +52,8 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-xl">加载中...</div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <Loading text="加载意图列表..." size="lg" />
       </div>
     );
   }
@@ -95,12 +103,39 @@ export default function Dashboard() {
             onClose={() => setShowCreate(false)}
             onSuccess={() => {
               setShowCreate(false);
+              toast.success('意图创建成功！');
               fetchIntents();
             }}
           />
         )}
 
-        <IntentList intents={intents} onUpdate={fetchIntents} />
+        {error && !loading && (
+          <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+            {error}
+            <button
+              onClick={fetchIntents}
+              className="ml-4 text-red-600 underline hover:text-red-800"
+            >
+              重试
+            </button>
+          </div>
+        )}
+
+        {!loading && intents.length === 0 && !error ? (
+          <EmptyState
+            title="还没有创建任何意图"
+            description="点击"创建新意图"开始您的第一个意图"
+            action={{
+              label: '创建新意图',
+              onClick: () => setShowCreate(true),
+            }}
+            icon="🎯"
+          />
+        ) : (
+          <IntentList intents={intents} onUpdate={fetchIntents} />
+        )}
+
+        <ToastContainer toasts={toast.toasts} onRemove={toast.removeToast} />
       </main>
     </div>
   );

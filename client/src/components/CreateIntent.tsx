@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import apiClient from '../api/client';
+import { useToast, ToastContainer } from './Toast';
+import { LoadingSpinner } from './Loading';
 
 interface CreateIntentProps {
   onClose: () => void;
@@ -10,6 +12,7 @@ export default function CreateIntent({ onClose, onSuccess }: CreateIntentProps) 
   const [userInput, setUserInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const toast = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,9 +26,14 @@ export default function CreateIntent({ onClose, onSuccess }: CreateIntentProps) 
 
     try {
       await apiClient.post('/intents/create', { userInput });
-      onSuccess();
+      toast.success('意图创建成功！AI正在分析...');
+      setTimeout(() => {
+        onSuccess();
+      }, 1000);
     } catch (err: any) {
-      setError(err.response?.data?.error || '创建意图失败');
+      const errorMsg = err.response?.data?.error || '创建意图失败';
+      setError(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -69,13 +77,21 @@ export default function CreateIntent({ onClose, onSuccess }: CreateIntentProps) 
             </button>
             <button
               type="submit"
-              disabled={loading}
-              className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 disabled:opacity-50"
+              disabled={loading || !userInput.trim()}
+              className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
             >
-              {loading ? 'AI分析中...' : '创建意图'}
+              {loading ? (
+                <>
+                  <LoadingSpinner className="mr-2" />
+                  AI分析中...
+                </>
+              ) : (
+                '创建意图'
+              )}
             </button>
           </div>
         </form>
+        <ToastContainer toasts={toast.toasts} onRemove={toast.removeToast} />
       </div>
     </div>
   );
