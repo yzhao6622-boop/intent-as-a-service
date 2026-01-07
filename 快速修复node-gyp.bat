@@ -5,19 +5,19 @@ echo 快速修复 node-gyp 配置
 echo ========================================
 echo.
 
-echo [步骤1] 配置 npm 使用 Visual Studio 2022 (兼容模式)...
-call npm config set msvs_version 2022
-if %errorLevel% neq 0 (
-    echo [错误] 配置失败
-    pause
-    exit /b 1
-)
+echo [步骤1] 设置 node-gyp 环境变量...
+REM 设置环境变量（当前会话）
+set npm_config_msvs_version=2022
+set GYP_MSVS_VERSION=2022
 
-echo [成功] 已配置
+echo [成功] 已设置环境变量
+echo   npm_config_msvs_version=2022
+echo   GYP_MSVS_VERSION=2022
 echo.
 
-echo [步骤2] 验证配置...
-call npm config get msvs_version
+echo [步骤2] 验证环境变量...
+echo npm_config_msvs_version=%npm_config_msvs_version%
+echo GYP_MSVS_VERSION=%GYP_MSVS_VERSION%
 echo.
 
 echo ========================================

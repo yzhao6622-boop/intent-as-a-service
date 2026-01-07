@@ -53,15 +53,24 @@ if (-not $foundVS) {
 }
 
 Write-Host ""
-Write-Host "[步骤2] 配置 npm 使用 Visual Studio $vsVersion..." -ForegroundColor Yellow
-
-# 设置 npm 配置
-npm config set msvs_version $vsVersion
+Write-Host "[步骤2] 设置 node-gyp 环境变量..." -ForegroundColor Yellow
 
 # 设置环境变量（当前会话）
 $env:npm_config_msvs_version = $vsVersion
+$env:GYP_MSVS_VERSION = $vsVersion
 
-Write-Host "[成功] 已配置 npm 使用 Visual Studio $vsVersion" -ForegroundColor Green
+# 尝试设置系统环境变量（需要管理员权限）
+try {
+    [System.Environment]::SetEnvironmentVariable("npm_config_msvs_version", $vsVersion, "User")
+    [System.Environment]::SetEnvironmentVariable("GYP_MSVS_VERSION", $vsVersion, "User")
+    Write-Host "[成功] 已设置用户环境变量（永久）" -ForegroundColor Green
+} catch {
+    Write-Host "[提示] 无法设置永久环境变量，仅设置当前会话" -ForegroundColor Yellow
+}
+
+Write-Host "[成功] 已设置环境变量：" -ForegroundColor Green
+Write-Host "  npm_config_msvs_version = $vsVersion" -ForegroundColor Cyan
+Write-Host "  GYP_MSVS_VERSION = $vsVersion" -ForegroundColor Cyan
 Write-Host ""
 
 # 检查是否有 vcvarsall.bat
@@ -69,14 +78,21 @@ $vcvarsPath = Join-Path $foundVS "VC\Auxiliary\Build\vcvarsall.bat"
 if (Test-Path $vcvarsPath) {
     Write-Host "[成功] 找到 vcvarsall.bat: $vcvarsPath" -ForegroundColor Green
 } else {
-    Write-Host "[警告] 未找到 vcvarsall.bat，可能缺少 C++ 工作负载" -ForegroundColor Yellow
-    Write-Host "请确保安装了 'Desktop development with C++' 工作负载" -ForegroundColor Yellow
+    # 尝试查找其他可能的路径（Visual Studio 2026 可能路径不同）
+    $altVcvarsPath = Join-Path $foundVS "VC\Tools\MSVC\*\bin\Hostx64\x64\vcvars64.bat"
+    $altPaths = Get-ChildItem -Path $altVcvarsPath -ErrorAction SilentlyContinue
+    if ($altPaths) {
+        Write-Host "[成功] 找到 vcvars64.bat: $($altPaths[0].FullName)" -ForegroundColor Green
+    } else {
+        Write-Host "[警告] 未找到 vcvarsall.bat，可能缺少 C++ 工作负载" -ForegroundColor Yellow
+        Write-Host "请确保安装了 'Desktop development with C++' 工作负载" -ForegroundColor Yellow
+    }
 }
 
 Write-Host ""
-Write-Host "[步骤3] 验证配置..." -ForegroundColor Yellow
-$config = npm config get msvs_version
-Write-Host "npm msvs_version 配置: $config" -ForegroundColor Cyan
+Write-Host "[步骤3] 验证环境变量..." -ForegroundColor Yellow
+Write-Host "npm_config_msvs_version: $env:npm_config_msvs_version" -ForegroundColor Cyan
+Write-Host "GYP_MSVS_VERSION: $env:GYP_MSVS_VERSION" -ForegroundColor Cyan
 
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
