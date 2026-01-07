@@ -11,19 +11,28 @@ import marketplaceRoutes from './routes/marketplace';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3002;
+const PORT = parseInt(process.env.PORT || '3002', 10);
 
 // 中间件
-// CORS 配置 - 简化配置，确保预检请求能通过
+// CORS 配置 - 明确配置，确保预检请求能通过
 app.use(cors({
-  origin: true, // 允许所有来源（生产环境建议限制）
+  origin: function (origin, callback) {
+    // 允许所有来源（包括IP地址和localhost）
+    // 生产环境可以限制为特定域名
+    callback(null, true);
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
   exposedHeaders: ['Content-Length', 'X-Foo', 'X-Bar'],
   preflightContinue: false,
   optionsSuccessStatus: 204,
+  maxAge: 86400, // 预检请求缓存24小时
 }));
+
+// 明确处理 OPTIONS 预检请求（双重保障）
+app.options('*', cors());
+
 app.use(express.json());
 
 // 路由
