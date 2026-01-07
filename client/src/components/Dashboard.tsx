@@ -50,6 +50,11 @@ export default function Dashboard() {
     navigate('/login');
   };
 
+  const emptyStateAction = {
+    label: '创建新意图',
+    onClick: () => setShowCreate(true),
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -124,11 +129,8 @@ export default function Dashboard() {
         {!loading && intents.length === 0 && !error ? (
           <EmptyState
             title="还没有创建任何意图"
-            description="点击"创建新意图"开始您的第一个意图"
-            action={{
-              label: '创建新意图',
-              onClick: () => setShowCreate(true),
-            }}
+            description="点击「创建新意图」开始您的第一个意图"
+            action={emptyStateAction}
             icon="🎯"
           />
         ) : (
