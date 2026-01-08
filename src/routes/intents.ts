@@ -44,8 +44,14 @@ router.post('/create', async (req: AuthRequest, res) => {
       ]
     );
 
-    const intentId = (result as any).lastID;
+    // better-sqlite3 使用 lastInsertRowid 而不是 lastID
+    const intentId = (result as any).lastInsertRowid || (result as any).lastID;
+    console.log(`[创建意图] dbRun返回结果:`, result);
     console.log(`[创建意图] 意图记录创建成功，ID: ${intentId}`);
+    
+    if (!intentId) {
+      throw new Error(`无法获取新创建的意图ID，result: ${JSON.stringify(result)}`);
+    }
 
     // 生成阶段拆解
     console.log(`[创建意图] 生成阶段拆解...`);
