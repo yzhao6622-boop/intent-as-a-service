@@ -122,6 +122,7 @@ router.get('/browse', async (req: AuthRequest, res) => {
 router.post('/purchase/:marketplaceId', async (req: AuthRequest, res) => {
   try {
     const marketplaceId = parseInt(req.params.marketplaceId);
+    let originalIntentId: number;
 
     // 先尝试通过marketplace_id查找
     let listing = await dbGet(
@@ -145,40 +146,116 @@ router.post('/purchase/:marketplaceId', async (req: AuthRequest, res) => {
         return res.status(400).json({ error: '不能购买自己的意图' });
       }
 
+      originalIntentId = intent.id;
+
       // 自动发布到市场并购买
-      const result = await dbRun(
+      await dbRun(
         `INSERT INTO intent_marketplace (intent_id, seller_id, buyer_id, status, purchased_at)
          VALUES (?, ?, ?, 'purchased', CURRENT_TIMESTAMP)`,
         [marketplaceId, intent.user_id, req.user!.id]
       );
+    } else {
+      if (listing.status !== 'available') {
+        return res.status(400).json({ error: '该意图已不可用' });
+      }
 
-      res.json({ message: '购买成功' });
-      return;
+      // 获取意图信息以检查所有者
+      const intent = await dbGet(
+        'SELECT * FROM intents WHERE id = ?',
+        [listing.intent_id]
+      ) as any;
+
+      if (intent && intent.user_id === req.user!.id) {
+        return res.status(400).json({ error: '不能购买自己的意图' });
+      }
+
+      originalIntentId = listing.intent_id;
+
+      // 更新购买记录
+      await dbRun(
+        `UPDATE intent_marketplace 
+         SET buyer_id = ?, status = 'purchased', purchased_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [req.user!.id, marketplaceId]
+      );
     }
 
-    if (listing.status !== 'available') {
-      return res.status(400).json({ error: '该意图已不可用' });
-    }
-
-    // 获取意图信息以检查所有者
-    const intent = await dbGet(
+    // 获取原始意图信息（用于检查重复订阅）
+    const originalIntent = await dbGet(
       'SELECT * FROM intents WHERE id = ?',
-      [listing.intent_id]
-    ) as any;
+      [originalIntentId]
+    ) as Intent;
 
-    if (intent && intent.user_id === req.user!.id) {
-      return res.status(400).json({ error: '不能购买自己的意图' });
+    if (!originalIntent) {
+      return res.status(404).json({ error: '原始意图不存在' });
     }
 
-    // 更新购买记录
-    await dbRun(
-      `UPDATE intent_marketplace 
-       SET buyer_id = ?, status = 'purchased', purchased_at = CURRENT_TIMESTAMP
-       WHERE id = ?`,
-      [req.user!.id, marketplaceId]
+    // 检查用户是否已经订阅过这个意图（通过检查购买记录和意图副本）
+    const existingPurchase = await dbGet(
+      `SELECT * FROM intent_marketplace 
+       WHERE intent_id = ? AND buyer_id = ? AND status = 'purchased'`,
+      [originalIntentId, req.user!.id]
     );
 
-    res.json({ message: '购买成功' });
+    if (existingPurchase) {
+      // 查找用户已经创建的订阅意图副本
+      const existingIntent = await dbGet(
+        `SELECT i.* FROM intents i
+         WHERE i.user_id = ? AND i.title = ? AND i.description = ?
+         ORDER BY i.created_at DESC LIMIT 1`,
+        [req.user!.id, originalIntent.title, originalIntent.description]
+      );
+      
+      if (existingIntent) {
+        return res.json({ 
+          message: '您已经订阅过这个意图', 
+          intentId: existingIntent.id 
+        });
+      }
+    }
+
+    // 为用户创建意图副本
+    const newIntentResult = await dbRun(
+      `INSERT INTO intents (user_id, title, description, category, time_window_days, credibility_score, status, stage)
+       VALUES (?, ?, ?, ?, ?, ?, 'active', ?)`,
+      [
+        req.user!.id,
+        originalIntent.title,
+        originalIntent.description,
+        originalIntent.category,
+        originalIntent.time_window_days,
+        originalIntent.credibility_score,
+        originalIntent.stage || 'initial',
+      ]
+    );
+
+    const newIntentId = (newIntentResult as any).lastID;
+
+    // 复制原始意图的所有阶段
+    const originalStages = await dbAll(
+      'SELECT * FROM intent_stages WHERE intent_id = ? ORDER BY stage_order',
+      [originalIntentId]
+    );
+
+    for (const stage of originalStages) {
+      await dbRun(
+        `INSERT INTO intent_stages (intent_id, stage_name, stage_order, description, verification_points, completed)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [
+          newIntentId,
+          stage.stage_name,
+          stage.stage_order,
+          stage.description,
+          stage.verification_points,
+          stage.completed || 0,
+        ]
+      );
+    }
+
+    // 更新购买记录，关联到新的意图ID（可选，保留原意图ID也可以）
+    // 这里我们保留原意图ID的关联，但用户拥有的是新创建的意图副本
+
+    res.json({ message: '订阅成功', intentId: newIntentId });
   } catch (error) {
     console.error('购买意图错误:', error);
     res.status(500).json({ error: '购买意图失败' });
