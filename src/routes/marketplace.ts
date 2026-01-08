@@ -148,9 +148,8 @@ router.post('/purchase/:marketplaceId', async (req: AuthRequest, res) => {
 
       originalIntentId = intent.id;
     } else {
-      if (listing.status !== 'available') {
-        return res.status(400).json({ error: '该意图已不可用' });
-      }
+      // 移除status检查，允许重复订阅
+      // 即使状态是'purchased'也可以再次订阅
 
       // 获取意图信息以检查所有者
       const intent = await dbGet(
@@ -158,14 +157,18 @@ router.post('/purchase/:marketplaceId', async (req: AuthRequest, res) => {
         [listing.intent_id]
       ) as any;
 
-      if (intent && intent.user_id === req.user!.id) {
+      if (!intent) {
+        return res.status(404).json({ error: '意图不存在' });
+      }
+
+      if (intent.user_id === req.user!.id) {
         return res.status(400).json({ error: '不能购买自己的意图' });
       }
 
       originalIntentId = listing.intent_id;
     }
 
-    // 获取原始意图信息（用于检查重复订阅）
+    // 获取原始意图信息
     const originalIntent = await dbGet(
       'SELECT * FROM intents WHERE id = ?',
       [originalIntentId]
@@ -175,47 +178,13 @@ router.post('/purchase/:marketplaceId', async (req: AuthRequest, res) => {
       return res.status(404).json({ error: '原始意图不存在' });
     }
 
-    // 先检查用户是否已经订阅过这个意图（通过检查意图副本）
-    const existingIntent = await dbGet(
-      `SELECT i.* FROM intents i
-       WHERE i.user_id = ? AND i.title = ? AND i.description = ?
-       ORDER BY i.created_at DESC LIMIT 1`,
-      [req.user!.id, originalIntent.title, originalIntent.description]
+    // 允许重复订阅，每次订阅都创建新的购买记录和意图副本
+    // 创建新的购买记录（不更新现有记录，允许多次订阅）
+    await dbRun(
+      `INSERT INTO intent_marketplace (intent_id, seller_id, buyer_id, status, purchased_at)
+       VALUES (?, ?, ?, 'purchased', CURRENT_TIMESTAMP)`,
+      [originalIntentId, originalIntent.user_id, req.user!.id]
     );
-    
-    if (existingIntent) {
-      // 检查是否有对应的购买记录
-      const existingPurchase = await dbGet(
-        `SELECT * FROM intent_marketplace 
-         WHERE intent_id = ? AND buyer_id = ? AND status = 'purchased'`,
-        [originalIntentId, req.user!.id]
-      );
-      
-      if (existingPurchase) {
-        return res.json({ 
-          message: '您已经订阅过这个意图', 
-          intentId: existingIntent.id 
-        });
-      }
-    }
-
-    // 创建或更新购买记录
-    if (!listing) {
-      // 自动发布到市场并购买
-      await dbRun(
-        `INSERT INTO intent_marketplace (intent_id, seller_id, buyer_id, status, purchased_at)
-         VALUES (?, ?, ?, 'purchased', CURRENT_TIMESTAMP)`,
-        [originalIntentId, originalIntent.user_id, req.user!.id]
-      );
-    } else {
-      // 更新购买记录
-      await dbRun(
-        `UPDATE intent_marketplace 
-         SET buyer_id = ?, status = 'purchased', purchased_at = CURRENT_TIMESTAMP
-         WHERE id = ?`,
-        [req.user!.id, marketplaceId]
-      );
-    }
 
     // 为用户创建意图副本
     console.log(`[购买] 为用户 ${req.user!.id} 创建意图副本，原始意图ID: ${originalIntentId}`);
