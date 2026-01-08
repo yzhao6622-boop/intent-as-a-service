@@ -202,8 +202,13 @@ router.post('/purchase/:marketplaceId', async (req: AuthRequest, res) => {
       ]
     );
 
-    const newIntentId = (newIntentResult as any).lastID;
+    // better-sqlite3 使用 lastInsertRowid 而不是 lastID
+    const newIntentId = (newIntentResult as any).lastInsertRowid || (newIntentResult as any).lastID;
     console.log(`[购买] 创建的新意图ID: ${newIntentId}, 用户ID: ${req.user!.id}`);
+    
+    if (!newIntentId) {
+      throw new Error(`无法获取新创建的意图ID`);
+    }
 
     // 复制原始意图的所有阶段
     const originalStages = await dbAll(

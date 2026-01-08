@@ -29,7 +29,8 @@ router.post('/register', async (req, res) => {
       [email, passwordHash, name || null]
     );
 
-    const userId = (result as any).lastID;
+    // better-sqlite3 使用 lastInsertRowid 而不是 lastID
+    const userId = (result as any).lastInsertRowid || (result as any).lastID;
     console.log(`[注册] 创建用户成功，用户ID: ${userId}, 邮箱: ${email}`);
 
     // 验证用户是否真的创建成功
