@@ -30,6 +30,15 @@ router.post('/register', async (req, res) => {
     );
 
     const userId = (result as any).lastID;
+    console.log(`[注册] 创建用户成功，用户ID: ${userId}, 邮箱: ${email}`);
+
+    // 验证用户是否真的创建成功
+    const verifyUser = await dbGet('SELECT id, email, name FROM users WHERE id = ?', [userId]);
+    if (!verifyUser) {
+      console.error(`[注册] 错误：用户创建后查询不到，用户ID: ${userId}`);
+      return res.status(500).json({ error: '用户创建失败，请重试' });
+    }
+    console.log(`[注册] 验证用户存在:`, verifyUser);
 
     // 生成JWT令牌
     const token = jwt.sign(
@@ -37,6 +46,8 @@ router.post('/register', async (req, res) => {
       process.env.JWT_SECRET || 'secret',
       { expiresIn: '7d' }
     );
+
+    console.log(`[注册] 生成JWT token，userId: ${userId}`);
 
     res.json({
       token,
@@ -46,9 +57,10 @@ router.post('/register', async (req, res) => {
         name,
       },
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('注册错误:', error);
-    res.status(500).json({ error: '注册失败' });
+    console.error('错误详情:', error.message, error.stack);
+    res.status(500).json({ error: `注册失败: ${error.message || '未知错误'}` });
   }
 });
 
