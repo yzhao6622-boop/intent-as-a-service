@@ -10,7 +10,8 @@ if (!fs.existsSync(dbDir)) {
   fs.mkdirSync(dbDir, { recursive: true });
 }
 
-const db = new Database(dbPath);
+// 使用类型断言避免类型导出问题
+const db: any = new Database(dbPath);
 
 // 启用外键约束
 db.pragma('foreign_keys = ON');
