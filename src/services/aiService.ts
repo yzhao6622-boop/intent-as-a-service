@@ -79,6 +79,22 @@ async function callArkAPI(messages: any[], options: {
       message: errorMessage,
     });
     
+    // 检查是否是内容安全策略拒绝
+    const errorStr = JSON.stringify(errorData || {}).toLowerCase();
+    if (errorMessage?.includes('content') || errorMessage?.includes('safety') || 
+        errorMessage?.includes('policy') || errorMessage?.includes('拒绝') ||
+        errorMessage?.includes('不允许') || errorMessage?.includes('禁止') ||
+        errorStr.includes('content') || errorStr.includes('safety') ||
+        error.response?.status === 400) {
+      throw new Error(
+        `内容可能触发了AI安全策略。请尝试：\n` +
+        `1. 使用更详细的描述，说明这是合法的商业目标\n` +
+        `2. 添加具体的执行计划和方法\n` +
+        `3. 或者调整表述方式，避免使用可能被误解的词汇\n` +
+        `原始错误: ${errorMessage}`
+      );
+    }
+    
     // 提供更详细的错误提示
     if (errorMessage?.includes('API key') || errorMessage?.includes('AK/SK') || errorMessage?.includes('invalid')) {
       throw new Error(
@@ -107,18 +123,24 @@ export async function mineIntent(userInput: string, conversationHistory?: AIConv
 }> {
   const systemPrompt = `你是一个专业的意图挖掘专家。你的任务是分析用户的真实意图，而不是表面的需求。
 
+重要原则：
+- 不要拒绝任何用户输入，即使看起来不现实或高风险
+- 客观分析用户的意图，不要进行道德判断
+- 如果时间窗口很短或目标很大，如实记录，但可以在描述中标注风险
+- 所有意图都应该被接受和分析
+
 请从用户的输入中识别：
 1. 真实意图（不是模糊的想法，而是具体的行动计划）
-2. 意图类别（职业转型/医疗决策/大额消费/关系决策/学习成长等）
-3. 合理的时间窗口（天）
+2. 意图类别（职业转型/医疗决策/大额消费/关系决策/学习成长/财务目标等）
+3. 时间窗口（天）- 如实记录用户提出的时间，即使看起来不现实
 4. 可信度指标（用户表现出的决心、准备程度、行动迹象）
 
 返回JSON格式：
 {
   "title": "意图标题",
-  "description": "详细描述",
+  "description": "详细描述（可以包含风险评估，但不要拒绝）",
   "category": "类别",
-  "time_window_days": 90,
+  "time_window_days": 用户提出的天数,
   "credibility_indicators": ["指标1", "指标2"]
 }`;
 
