@@ -13,15 +13,25 @@ router.use(authenticateToken);
 router.post('/create', async (req: AuthRequest, res) => {
   try {
     const { userInput } = req.body;
+    console.log(`[创建意图] 用户ID: ${req.user!.id}, 输入: ${userInput?.substring(0, 100)}...`);
 
     if (!userInput) {
       return res.status(400).json({ error: '用户输入是必填项' });
     }
 
     // AI挖掘意图
-    const minedIntent = await mineIntent(userInput);
+    console.log(`[创建意图] 开始AI挖掘意图...`);
+    let minedIntent;
+    try {
+      minedIntent = await mineIntent(userInput);
+      console.log(`[创建意图] AI挖掘成功:`, minedIntent);
+    } catch (error: any) {
+      console.error(`[创建意图] AI挖掘失败:`, error);
+      throw new Error(`AI挖掘意图失败: ${error.message || '未知错误'}`);
+    }
 
     // 创建意图记录
+    console.log(`[创建意图] 创建意图记录...`);
     const result = await dbRun(
       `INSERT INTO intents (user_id, title, description, category, time_window_days, credibility_score, status, stage)
        VALUES (?, ?, ?, ?, ?, 0, 'active', 'initial')`,
@@ -35,39 +45,67 @@ router.post('/create', async (req: AuthRequest, res) => {
     );
 
     const intentId = (result as any).lastID;
+    console.log(`[创建意图] 意图记录创建成功，ID: ${intentId}`);
 
     // 生成阶段拆解
+    console.log(`[创建意图] 生成阶段拆解...`);
     const intent = await dbGet('SELECT * FROM intents WHERE id = ?', [intentId]) as Intent;
-    const stagesData = await generateIntentStages(intent);
+    let stagesData;
+    try {
+      stagesData = await generateIntentStages(intent);
+      console.log(`[创建意图] 阶段拆解生成成功，阶段数: ${stagesData.stages.length}`);
+    } catch (error: any) {
+      console.error(`[创建意图] 生成阶段拆解失败:`, error);
+      // 即使阶段生成失败，也继续创建意图
+      stagesData = { stages: [] };
+    }
 
     // 保存阶段
-    for (const stage of stagesData.stages) {
-      await dbRun(
-        `INSERT INTO intent_stages (intent_id, stage_name, stage_order, description, verification_points)
-         VALUES (?, ?, ?, ?, ?)`,
-        [intentId, stage.stage_name, stage.stage_order, stage.description, stage.verification_points]
-      );
+    if (stagesData.stages && stagesData.stages.length > 0) {
+      console.log(`[创建意图] 保存阶段...`);
+      for (const stage of stagesData.stages) {
+        await dbRun(
+          `INSERT INTO intent_stages (intent_id, stage_name, stage_order, description, verification_points)
+           VALUES (?, ?, ?, ?, ?)`,
+          [intentId, stage.stage_name, stage.stage_order, stage.description, stage.verification_points]
+        );
+      }
+      console.log(`[创建意图] 阶段保存成功`);
     }
 
     // 初始验证
-    const verification = await verifyIntent(intentId);
-    await dbRun(
-      `UPDATE intents SET credibility_score = ? WHERE id = ?`,
-      [verification.credibility_score, intentId]
-    );
+    console.log(`[创建意图] 开始初始验证...`);
+    let verification;
+    try {
+      verification = await verifyIntent(intentId);
+      console.log(`[创建意图] 验证完成，可信度: ${verification.credibility_score}`);
+      
+      await dbRun(
+        `UPDATE intents SET credibility_score = ? WHERE id = ?`,
+        [verification.credibility_score, intentId]
+      );
 
-    await dbRun(
-      `INSERT INTO verification_records (intent_id, verification_type, ai_analysis, passed)
-       VALUES (?, 'initial', ?, ?)`,
-      [intentId, verification.analysis, verification.passed ? 1 : 0]
-    );
+      await dbRun(
+        `INSERT INTO verification_records (intent_id, verification_type, ai_analysis, passed)
+         VALUES (?, 'initial', ?, ?)`,
+        [intentId, verification.analysis, verification.passed ? 1 : 0]
+      );
+    } catch (error: any) {
+      console.error(`[创建意图] 验证失败:`, error);
+      // 即使验证失败，也继续返回意图
+      console.log(`[创建意图] 验证失败，但继续创建意图`);
+    }
 
     // 返回完整的意图档案
+    console.log(`[创建意图] 获取意图档案...`);
     const intentProfile = await getIntentProfile(intentId);
+    console.log(`[创建意图] 创建成功，意图ID: ${intentId}`);
     res.json(intentProfile);
-  } catch (error) {
-    console.error('创建意图错误:', error);
-    res.status(500).json({ error: '创建意图失败' });
+  } catch (error: any) {
+    console.error('[创建意图] 错误:', error);
+    console.error('[创建意图] 错误详情:', error.message, error.stack);
+    const errorMessage = error.message || '创建意图失败';
+    res.status(500).json({ error: errorMessage });
   }
 });
 

@@ -137,13 +137,36 @@ export async function mineIntent(userInput: string, conversationHistory?: AIConv
 
   messages.push({ role: 'user', content: userInput });
 
-  const response = await callArkAPI(messages, {
-    temperature: 0.7,
-    response_format: { type: 'json_object' },
-  });
+  try {
+    const response = await callArkAPI(messages, {
+      temperature: 0.7,
+      response_format: { type: 'json_object' },
+    });
 
-  const result = JSON.parse(response.choices[0].message.content || '{}');
-  return result;
+    const content = response.choices?.[0]?.message?.content;
+    if (!content) {
+      throw new Error('AI返回的内容为空');
+    }
+
+    let result;
+    try {
+      result = JSON.parse(content);
+    } catch (parseError: any) {
+      console.error('JSON解析失败，原始内容:', content);
+      throw new Error(`AI返回格式错误: ${parseError.message}`);
+    }
+
+    // 验证必需字段
+    if (!result.title || !result.description || !result.category) {
+      console.error('AI返回数据缺少必需字段:', result);
+      throw new Error('AI返回的数据不完整，缺少必需字段');
+    }
+
+    return result;
+  } catch (error: any) {
+    console.error('mineIntent失败:', error);
+    throw error;
+  }
 }
 
 /**

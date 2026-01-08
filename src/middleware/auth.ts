@@ -22,10 +22,10 @@ export function authenticateToken(req: AuthRequest, res: Response, next: NextFun
 
   jwt.verify(token, process.env.JWT_SECRET || 'secret', async (err, decoded: any) => {
     try {
-      if (err) {
+    if (err) {
         console.error('[认证] JWT验证失败:', err);
-        return res.status(403).json({ error: '无效的认证令牌' });
-      }
+      return res.status(403).json({ error: '无效的认证令牌' });
+    }
 
       if (!decoded || !decoded.userId) {
         console.error('[认证] JWT解码结果无效:', decoded);
@@ -34,19 +34,19 @@ export function authenticateToken(req: AuthRequest, res: Response, next: NextFun
 
       console.log(`[认证] JWT解码成功，decoded:`, decoded);
       console.log(`[认证] 查询用户，userId: ${decoded.userId}`);
-      
-      const user = await dbGet('SELECT id, email, name, created_at FROM users WHERE id = ?', [decoded.userId]) as User;
-      if (!user) {
+
+    const user = await dbGet('SELECT id, email, name, created_at FROM users WHERE id = ?', [decoded.userId]) as User;
+    if (!user) {
         console.error(`[认证] 用户不存在，userId: ${decoded.userId}`);
         // 列出所有用户ID以便调试
         const allUsers = await dbAll('SELECT id, email FROM users LIMIT 10') as any;
         console.error(`[认证] 数据库中的用户:`, allUsers);
-        return res.status(403).json({ error: '用户不存在' });
-      }
+      return res.status(403).json({ error: '用户不存在' });
+    }
 
       console.log(`[认证] 用户验证成功，userId: ${user.id}, email: ${user.email}`);
-      req.user = user;
-      next();
+    req.user = user;
+    next();
     } catch (error: any) {
       console.error('[认证] 认证过程出错:', error);
       console.error('[认证] 错误详情:', error.message, error.stack);

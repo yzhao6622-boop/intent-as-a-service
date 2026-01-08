@@ -151,19 +151,19 @@ router.post('/purchase/:marketplaceId', async (req: AuthRequest, res) => {
       // 移除status检查，允许重复订阅
       // 即使状态是'purchased'也可以再次订阅
 
-      // 获取意图信息以检查所有者
-      const intent = await dbGet(
-        'SELECT * FROM intents WHERE id = ?',
-        [listing.intent_id]
-      ) as any;
+    // 获取意图信息以检查所有者
+    const intent = await dbGet(
+      'SELECT * FROM intents WHERE id = ?',
+      [listing.intent_id]
+    ) as any;
 
       if (!intent) {
         return res.status(404).json({ error: '意图不存在' });
       }
 
       if (intent.user_id === req.user!.id) {
-        return res.status(400).json({ error: '不能购买自己的意图' });
-      }
+      return res.status(400).json({ error: '不能购买自己的意图' });
+    }
 
       originalIntentId = listing.intent_id;
     }
@@ -223,7 +223,7 @@ router.post('/purchase/:marketplaceId', async (req: AuthRequest, res) => {
           stage.verification_points,
           stage.completed || 0,
         ]
-      );
+    );
     }
 
     // 更新购买记录，关联到新的意图ID（可选，保留原意图ID也可以）
