@@ -81,6 +81,7 @@ router.get('/list', async (req: AuthRequest, res) => {
     ) as Intent[];
 
     console.log(`[GET /list] 找到 ${intents.length} 个意图`);
+    console.log(`[GET /list] 意图ID列表:`, intents.map(i => i.id));
     res.json(intents);
   } catch (error: any) {
     console.error('[GET /list] 获取意图列表错误:', error);

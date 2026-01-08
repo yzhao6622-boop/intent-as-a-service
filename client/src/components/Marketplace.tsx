@@ -65,9 +65,14 @@ export default function Marketplace() {
     if (!window.confirm('确定要购买/订阅这个意图吗？')) return;
 
     try {
-      await apiClient.post(`/marketplace/purchase/${marketplaceId}`);
-      toast.success('购买成功！');
+      const response = await apiClient.post(`/marketplace/purchase/${marketplaceId}`);
+      toast.success('订阅成功！已添加到"我的意图"中');
       fetchListings();
+      
+      // 提示用户返回查看
+      if (window.confirm('订阅成功！是否返回"我的意图"查看？')) {
+        navigate('/dashboard');
+      }
     } catch (err: any) {
       const errorMsg = err.response?.data?.error || '购买失败';
       toast.error(errorMsg);
