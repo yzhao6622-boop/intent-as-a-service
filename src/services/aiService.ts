@@ -381,11 +381,20 @@ export async function generateIntentStages(intent: Intent): Promise<{
     verification_points: string;
   }>;
 }> {
+  // 验证intent参数
+  if (!intent) {
+    throw new Error('意图对象不能为空');
+  }
+  
+  if (!intent.title || !intent.description) {
+    throw new Error('意图对象缺少必需字段（title或description）');
+  }
+
   const systemPrompt = `为一个意图生成详细的阶段拆解。
 
 意图：${intent.title}
 描述：${intent.description}
-时间窗口：${intent.time_window_days}天
+时间窗口：${intent.time_window_days || 90}天
 
 请将意图拆解为3-6个阶段，每个阶段包含：
 - 阶段名称
@@ -408,11 +417,34 @@ export async function generateIntentStages(intent: Intent): Promise<{
     { role: 'system', content: systemPrompt },
   ];
 
-  const response = await callArkAPI(messages, {
-    temperature: 0.7,
-    response_format: { type: 'json_object' },
-  });
+  try {
+    const response = await callArkAPI(messages, {
+      temperature: 0.7,
+      response_format: { type: 'json_object' },
+    });
 
-  const result = JSON.parse(response.choices[0].message.content || '{}');
-  return result;
+    const content = response.choices?.[0]?.message?.content;
+    if (!content) {
+      throw new Error('AI返回的内容为空');
+    }
+
+    let result;
+    try {
+      result = JSON.parse(content);
+    } catch (parseError: any) {
+      console.error('JSON解析失败，原始内容:', content);
+      throw new Error(`AI返回格式错误: ${parseError.message}`);
+    }
+
+    // 验证返回数据
+    if (!result.stages || !Array.isArray(result.stages)) {
+      console.error('AI返回数据格式不正确:', result);
+      throw new Error('AI返回的数据格式不正确，缺少stages数组');
+    }
+
+    return result;
+  } catch (error: any) {
+    console.error('generateIntentStages失败:', error);
+    throw error;
+  }
 }

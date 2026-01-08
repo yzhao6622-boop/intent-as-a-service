@@ -50,12 +50,24 @@ router.post('/create', async (req: AuthRequest, res) => {
     // 生成阶段拆解
     console.log(`[创建意图] 生成阶段拆解...`);
     const intent = await dbGet('SELECT * FROM intents WHERE id = ?', [intentId]) as Intent;
+    
+    if (!intent) {
+      throw new Error(`无法找到刚创建的意图，ID: ${intentId}`);
+    }
+    
+    console.log(`[创建意图] 获取到的意图:`, {
+      id: intent.id,
+      title: intent.title,
+      description: intent.description?.substring(0, 50) + '...',
+    });
+    
     let stagesData;
     try {
       stagesData = await generateIntentStages(intent);
-      console.log(`[创建意图] 阶段拆解生成成功，阶段数: ${stagesData.stages.length}`);
+      console.log(`[创建意图] 阶段拆解生成成功，阶段数: ${stagesData.stages?.length || 0}`);
     } catch (error: any) {
       console.error(`[创建意图] 生成阶段拆解失败:`, error);
+      console.error(`[创建意图] 错误详情:`, error.message, error.stack);
       // 即使阶段生成失败，也继续创建意图
       stagesData = { stages: [] };
     }
