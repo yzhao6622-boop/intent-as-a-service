@@ -31,9 +31,22 @@ export default function CreateIntent({ onClose, onSuccess }: CreateIntentProps) 
         onSuccess();
       }, 1000);
     } catch (err: any) {
-      const errorMsg = err.response?.data?.error || '创建意图失败';
+      console.error('创建意图错误:', err);
+      console.error('错误详情:', err.response?.data);
+      
+      // 获取详细的错误信息
+      let errorMsg = '创建意图失败';
+      if (err.response?.data?.error) {
+        errorMsg = err.response.data.error;
+      } else if (err.message) {
+        errorMsg = err.message;
+      } else if (err.response?.status === 500) {
+        errorMsg = '服务器内部错误，请查看后端日志获取详细信息';
+      }
+      
+      // 如果是多行错误信息，显示完整内容
       setError(errorMsg);
-      toast.error(errorMsg);
+      toast.error(errorMsg.length > 100 ? errorMsg.substring(0, 100) + '...' : errorMsg);
     } finally {
       setLoading(false);
     }
