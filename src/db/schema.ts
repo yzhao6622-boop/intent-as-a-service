@@ -52,7 +52,9 @@ export function dbAll(sql: string, params?: any[]): Promise<any[]> {
   });
 }
 
-export { db };
+// 导出db实例（使用any类型避免类型导出问题）
+// 注意：如果不需要导出db，可以删除这行
+export const dbInstance: any = db;
 
 // 初始化数据库表
 export async function initDatabase() {

@@ -16,7 +16,7 @@ const PORT = parseInt(process.env.PORT || '3002', 10);
 // 中间件
 // CORS 配置 - 明确配置，确保预检请求能通过
 const corsOptions = {
-  origin: function (origin, callback) {
+  origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
     // 允许所有来源（包括IP地址和localhost）
     // 生产环境可以限制为特定域名
     callback(null, true);
