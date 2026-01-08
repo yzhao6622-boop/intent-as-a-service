@@ -98,13 +98,45 @@ router.post('/create', async (req: AuthRequest, res) => {
 
     // 返回完整的意图档案
     console.log(`[创建意图] 获取意图档案...`);
-    const intentProfile = await getIntentProfile(intentId);
-    console.log(`[创建意图] 创建成功，意图ID: ${intentId}`);
-    res.json(intentProfile);
+    try {
+      const intentProfile = await getIntentProfile(intentId);
+      console.log(`[创建意图] 创建成功，意图ID: ${intentId}`);
+      res.json(intentProfile);
+    } catch (profileError: any) {
+      console.error(`[创建意图] 获取意图档案失败:`, profileError);
+      // 即使获取档案失败，也返回基本的意图信息
+      const basicIntent = await dbGet('SELECT * FROM intents WHERE id = ?', [intentId]) as Intent;
+      if (basicIntent) {
+        res.json({
+          intent: basicIntent,
+          stages: [],
+          credibility_score: basicIntent.credibility_score,
+          progress_percentage: 0,
+          recent_verifications: [],
+        });
+      } else {
+        throw profileError;
+      }
+    }
   } catch (error: any) {
     console.error('[创建意图] 错误:', error);
-    console.error('[创建意图] 错误详情:', error.message, error.stack);
-    const errorMessage = error.message || '创建意图失败';
+    console.error('[创建意图] 错误详情:', error.message);
+    console.error('[创建意图] 错误堆栈:', error.stack);
+    
+    // 确保错误信息能正确传递
+    let errorMessage = '创建意图失败';
+    if (error.message) {
+      errorMessage = error.message;
+    } else if (typeof error === 'string') {
+      errorMessage = error;
+    }
+    
+    // 如果是AI相关错误，提供更友好的提示
+    if (errorMessage.includes('AI') || errorMessage.includes('API')) {
+      errorMessage = `AI服务错误: ${errorMessage}\n请检查AI API配置或稍后重试`;
+    }
+    
+    console.error('[创建意图] 返回错误信息:', errorMessage);
     res.status(500).json({ error: errorMessage });
   }
 });
